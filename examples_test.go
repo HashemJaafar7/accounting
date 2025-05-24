@@ -7,62 +7,78 @@ import (
 	"github.com/HashemJaafar7/accounting"
 )
 
-// Set up in-memory storage
-var inventoryStore = make(map[accounting.AccountAddress]accounting.Inventory)
-var lastEntry accounting.AccountingEntry
-var journal []accounting.AccountingEntry
-
 // Set up required helper functions
-func getInventory(addr accounting.AccountAddress) (accounting.Inventory, error) {
-	return inventoryStore[addr], nil
+type myDB struct {
+	myInv         accounting.AccountIDAndInventory
+	myEntries     []accounting.AccountingEntry
+	lastEntryTime accounting.TimeUnix
+	i             int
 }
 
-func setInventory(addr accounting.AccountAddress, inv accounting.Inventory) error {
-	inventoryStore[addr] = inv
+func (s *myDB) GetInventory(key accounting.AccountID) (accounting.Inventory, error) {
+	inv, ok := s.myInv[key]
+	if !ok {
+		// return nil, fmt.Errorf("ID %v not found", key)
+	}
+	return inv, nil
+}
+func (s *myDB) SetInventory(key accounting.AccountID, value accounting.Inventory) error {
+	s.myInv[key] = value
 	return nil
 }
-
-func getLastEntry() (accounting.AccountingEntry, error) {
-	return lastEntry, nil
+func (s *myDB) GetLastEntryTime() (accounting.TimeUnix, error) {
+	return s.lastEntryTime, nil
 }
-
-func setEntry(entry accounting.AccountingEntry) error {
-	lastEntry = entry
-	journal = append(journal, entry)
+func (s *myDB) SetEntry(value accounting.AccountingEntry) error {
+	s.lastEntryTime = value.TimeUnix
+	s.myEntries = append(s.myEntries, value)
 	return nil
 }
+func (s *myDB) IterOnJournal() (accounting.AccountingEntry, bool, error) {
+	if len(s.myEntries) == s.i {
+		return accounting.AccountingEntry{}, false, nil
+	}
+
+	a := s.myEntries[s.i]
+	s.i++
+	return a, true, nil
+}
+
+var kk myDB
 
 func Example_purchaseInventory() {
+	// Set up in-memory storage
+	kk.myInv = make(map[accounting.AccountID]accounting.Inventory)
+
 	const (
-		capital   accounting.AccountAddress = -1001
-		USD       accounting.AccountAddress = 2001
-		inventory accounting.AccountAddress = 1001
-		COGS      accounting.AccountAddress = 3001
-		revenue   accounting.AccountAddress = -4001
+		capital   accounting.AccountID = -1001
+		USD       accounting.AccountID = 2001
+		inventory accounting.AccountID = 1001
+		COGS      accounting.AccountID = 3001
+		revenue   accounting.AccountID = -4001
 	)
 	{
 		// Create an entry to start capital
 		entry := accounting.AccountingEntry{
-			EntryNumber: 1,
-			TimeUnix:    time.Now().Unix(),
+			TimeUnix: time.Now().UnixMicro(),
 			DoubleEntry: []accounting.SingleEntry{
 				{
-					CostFlowType:   accounting.INFLOW, //
-					AccountAddress: capital,           // capital
-					Quantity:       0,                 //
-					Amount:         1000,              // $1000 total
+					CostFlowType: accounting.INFLOW, //
+					AccountID:    capital,           // capital
+					Quantity:     0,                 //
+					Amount:       1000,              // $1000 total
 				},
 				{
-					CostFlowType:   accounting.INFLOW, // Cash going in
-					AccountAddress: USD,               // Cash account
-					Quantity:       1000,              //
-					Amount:         1000,              // $1000 total
+					CostFlowType: accounting.INFLOW, // Cash going in
+					AccountID:    USD,               // Cash account
+					Quantity:     1000,              //
+					Amount:       1000,              // $1000 total
 				},
 			},
 		}
 
 		// Add the entry to the journal
-		err := accounting.AddToJournal(entry, getInventory, setInventory, getLastEntry, setEntry)
+		err := accounting.AddToJournal(entry, &kk)
 		if err != nil {
 			fmt.Printf("Error: %v\n", err)
 			return
@@ -73,26 +89,25 @@ func Example_purchaseInventory() {
 	}
 
 	{
-		purchaseEntry := accounting.AccountingEntry{
-			EntryNumber: 2,
-			TimeUnix:    time.Now().Unix(),
+		entry := accounting.AccountingEntry{
+			TimeUnix: time.Now().UnixMicro(),
 			DoubleEntry: []accounting.SingleEntry{
 				{
-					CostFlowType:   accounting.INFLOW,
-					AccountAddress: inventory, // Inventory account
-					Quantity:       50,        // 50 units
-					Amount:         500,       // $500 total
+					CostFlowType: accounting.INFLOW,
+					AccountID:    inventory, // Inventory account
+					Quantity:     50,        // 50 units
+					Amount:       500,       // $500 total
 				},
 				{
-					CostFlowType:   accounting.WAC,
-					AccountAddress: USD, // Cash account
-					Quantity:       500,
-					Amount:         500,
+					CostFlowType: accounting.WAC,
+					AccountID:    USD, // Cash account
+					Quantity:     500,
+					Amount:       500,
 				},
 			},
 		}
 
-		err := accounting.AddToJournal(purchaseEntry, getInventory, setInventory, getLastEntry, setEntry)
+		err := accounting.AddToJournal(entry, &kk)
 		if err != nil {
 			fmt.Printf("Error: %v\n", err)
 			return
@@ -104,38 +119,37 @@ func Example_purchaseInventory() {
 
 	{
 		// Now sell 60 units at $15 each using FIFO costing
-		saleEntry := accounting.AccountingEntry{
-			EntryNumber: 3,
-			TimeUnix:    time.Now().Unix(),
+		entry := accounting.AccountingEntry{
+			TimeUnix: time.Now().UnixMicro(),
 			DoubleEntry: []accounting.SingleEntry{
 				{
-					CostFlowType:   accounting.FIFO, // Use FIFO costing
-					AccountAddress: inventory,       // Inventory account
-					Quantity:       5,               // Sell 5 units
-					Amount:         50,              // Cost of goods sold ($10/unit)
+					CostFlowType: accounting.FIFO, // Use FIFO costing
+					AccountID:    inventory,       // Inventory account
+					Quantity:     5,               // Sell 5 units
+					Amount:       50,              // Cost of goods sold ($10/unit)
 				},
 				{
-					CostFlowType:   accounting.INFLOW, //
-					AccountAddress: COGS,              // COGS account
-					Quantity:       5,                 //
-					Amount:         50,                //
+					CostFlowType: accounting.INFLOW, //
+					AccountID:    COGS,              // COGS account
+					Quantity:     5,                 //
+					Amount:       50,                //
 				},
 				{
-					CostFlowType:   accounting.INFLOW, //
-					AccountAddress: USD,               // cash account
-					Quantity:       80,                // Sell 60 units
-					Amount:         80,                // Cost of goods sold ($10/unit)
+					CostFlowType: accounting.INFLOW, //
+					AccountID:    USD,               // cash account
+					Quantity:     80,                // Sell 60 units
+					Amount:       80,                // Cost of goods sold ($10/unit)
 				},
 				{
-					CostFlowType:   accounting.INFLOW, //
-					AccountAddress: revenue,           // revenue account
-					Quantity:       5,                 // Sell 5 units price 16
-					Amount:         80,                //
+					CostFlowType: accounting.INFLOW, //
+					AccountID:    revenue,           // revenue account
+					Quantity:     5,                 // Sell 5 units price 16
+					Amount:       80,                //
 				},
 			},
 		}
 
-		err := accounting.AddToJournal(saleEntry, getInventory, setInventory, getLastEntry, setEntry)
+		err := accounting.AddToJournal(entry, &kk)
 		if err != nil {
 			fmt.Printf("Error: %v\n", err)
 			return
@@ -145,38 +159,31 @@ func Example_purchaseInventory() {
 		printInventory()
 	}
 
-	i := accounting.EntryNumber(1)
-	iterOnJournalFunction := func() (accounting.AccountingEntry, bool, error) {
-		a := journal[i]
-		i++
-		return a, len(journal) == int(i)+1, nil
-	}
-
-	err := accounting.CheckAllTheJournal(setInventory, iterOnJournalFunction)
+	err := accounting.CheckAllTheJournal(&kk)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		return
 	}
 
 	//output:
-	// address: -1001  inventory:[{1 0 1000}]
-	// address: 2001   inventory:[{1 1000 1000}]
+	// ID: -1001  inventory:[{1 0 1000}]
+	// ID: 2001   inventory:[{1 1000 1000}]
 	// ____________________________________________
-	// address: -1001  inventory:[{1 0 1000}]
-	// address: 2001   inventory:[{2 500 500}]
-	// address: 1001   inventory:[{2 50 500}]
+	// ID: -1001  inventory:[{1 0 1000}]
+	// ID: 2001   inventory:[{2 500 500}]
+	// ID: 1001   inventory:[{2 50 500}]
 	// ____________________________________________
-	// address: 2001   inventory:[{2 500 500} {3 80 80}]
-	// address: 1001   inventory:[{2 45 450}]
-	// address: 3001   inventory:[{3 5 50}]
-	// address: -4001  inventory:[{3 5 80}]
-	// address: -1001  inventory:[{1 0 1000}]
+	// ID: 2001   inventory:[{2 500 500} {3 80 80}]
+	// ID: 1001   inventory:[{2 45 450}]
+	// ID: 3001   inventory:[{3 5 50}]
+	// ID: -4001  inventory:[{3 5 80}]
+	// ID: -1001  inventory:[{1 0 1000}]
 	// ____________________________________________
 }
 
 func printInventory() {
-	for k, v := range inventoryStore {
-		fmt.Printf("address: %v\tinventory:%v\n", k, v)
+	for k, v := range kk.myInv {
+		fmt.Printf("ID: %v\tinventory:%v\n", k, v)
 	}
 	fmt.Println("____________________________________________")
 }

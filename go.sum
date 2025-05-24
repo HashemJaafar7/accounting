@@ -1,6 +1,2 @@
-github.com/HashemJaafar7/goerrors v0.1.8 h1:akEd9YDnxcZK7VDr+g8H3oZQFrY3reGrHoK+AlGzKhE=
-github.com/HashemJaafar7/goerrors v0.1.8/go.mod h1:ADu+Z2SSf66fJ+TKw9SKAcZGNSX6LGvkyAnm7lMFRmg=
-github.com/HashemJaafar7/testutils v0.1.8 h1:IU4NzjS/dW0kiEvUQkZqzECcBlsKrHRc72Zl70IQolY=
-github.com/HashemJaafar7/testutils v0.1.8/go.mod h1:6kiVGu+bWcTP9J3WfaYhozISK/iPHNmqmCPOgS68EoM=
 github.com/google/gofuzz v1.2.0 h1:xRy4A+RhZaiKjJ1bPfwQ8sedCA+YS2YcCHW6ec7JMi0=
 github.com/google/gofuzz v1.2.0/go.mod h1:dBl0BpW6vV/+mYPU4Po3pmUjxk6FQPldtuIdl/M65Eg=

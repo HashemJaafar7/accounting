@@ -8,4 +8,9 @@ require (
 	github.com/HashemJaafar7/testutils v0.1.8
 )
 
+replace (
+	github.com/HashemJaafar7/goerrors => ../goerrors
+	github.com/HashemJaafar7/testutils => ../testutils
+)
+
 require github.com/google/gofuzz v1.2.0 // indirect
